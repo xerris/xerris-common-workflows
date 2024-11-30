@@ -65,14 +65,19 @@ jobs:
       - name: Get current version
         id: get_version
         run: |
-          CURRENT_VERSION=$(curl -s https://api.nuget.org/v3-flatcontainer/${{ inputs.nuget-package-name }}/index.json | jq -r '.versions | map(select(startswith("2019.") | not)) | .[-1]')
+          CURRENT_VERSION=$(curl -s https://api.nuget.org/v3-flatcontainer/${{ inputs.nuget-package-name }}/index.json | jq -r '.versions | map(select(startswith("2019.") | not)) | .[-1] // "0.0.0"')
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
       - name: Calculate next version
         id: calc_version
         run: |
           CURRENT_VERSION=${{ steps.get_version.outputs.current_version }}
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          NEXT_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$((VERSION_PARTS[2] + 1))"
+          if [ "$CURRENT_VERSION" = "0.0.0" ]; then
+            NEXT_VERSION="0.0.1"
+          else
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+            NEXT_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$((VERSION_PARTS[2] + 1))"
+          fi
           echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
 
   tag:
