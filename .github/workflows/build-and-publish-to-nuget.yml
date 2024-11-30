@@ -56,24 +56,39 @@ jobs:
       - name: Test Project
         run: dotnet test ${{ inputs.csproj-path }} --verbosity normal
 
-  version:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check package and get version
-        id: get_version
-        run: |
-          PACKAGE_NAME="xerris.dotnet.test.essentials"
-          DEFAULT_VERSION="0.0.1"
-          
-          if curl -s -o /dev/null -w "%{http_code}" "https://api.nuget.org/v3-flatcontainer/$PACKAGE_NAME/index.json" | grep -q "200"; then
-            CURRENT_VERSION=$(curl -s "https://api.nuget.org/v3-flatcontainer/$PACKAGE_NAME/index.json" | jq -r '.versions[-1]')
-            echo "Current version of $PACKAGE_NAME: $CURRENT_VERSION"
-          else
-            echo "Package $PACKAGE_NAME not found. Using default version: $DEFAULT_VERSION"
-            CURRENT_VERSION=$DEFAULT_VERSION
-          fi
-          
-          echo "::set-output name=version::$CURRENT_VERSION"
+version:
+  runs-on: ubuntu-latest
+  outputs:
+    next_version: ${{ steps.increment_version.outputs.next_version }}
+  steps:
+    - name: Check package and get version
+      id: get_version
+      run: |
+        PACKAGE_NAME="${{inputs.nuget-package-name}}"
+        DEFAULT_VERSION="0.0.1"
+        
+        if curl -s -o /dev/null -w "%{http_code}" "https://api.nuget.org/v3-flatcontainer/$PACKAGE_NAME/index.json" | grep -q "200"; then
+          CURRENT_VERSION=$(curl -s "https://api.nuget.org/v3-flatcontainer/$PACKAGE_NAME/index.json" | jq -r '.versions[-1]')
+          echo "Current version of $PACKAGE_NAME: $CURRENT_VERSION"
+        else
+          echo "Package $PACKAGE_NAME not found. Using default version: $DEFAULT_VERSION"
+          CURRENT_VERSION=$DEFAULT_VERSION
+        fi
+        
+        echo "::set-output name=version::$CURRENT_VERSION"
+
+    - name: Increment version
+      id: increment_version
+      run: |
+        CURRENT_VERSION=${{ steps.get_version.outputs.version }}
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        NEW_PATCH=$((PATCH + 1))
+        NEXT_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+        echo "::set-output name=next_version::$NEXT_VERSION"
+        echo "Next version: $NEXT_VERSION"
 
   tag:
     needs: version
