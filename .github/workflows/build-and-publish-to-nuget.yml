@@ -104,7 +104,6 @@ jobs:
           git push origin "v$NEXT_VERSION"
 
   pack:
-    needs: [version, tag]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -112,12 +111,17 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
+
       - name: Pack NuGet package
-        run: >
-          dotnet pack ${{ inputs.csproj-path }}
-          --configuration Release
-          --output ./packages
-          /p:Version=${{ needs.version.outputs.next_version }}
+        env:
+          DOTNET_OUTPUT_DIR: ./packages
+          PACKAGE_VERSION: 0.0.2
+        run: |
+          dotnet pack ${{ inputs.csproj-path }} \
+          --configuration Release \
+          /p:Version=$PACKAGE_VERSION \
+          /p:PackageOutputPath=$DOTNET_OUTPUT_DIR
+          
       - name: Upload NuGet package
         uses: actions/upload-artifact@v4
         with:
