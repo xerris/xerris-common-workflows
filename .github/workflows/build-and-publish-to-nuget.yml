@@ -10,7 +10,7 @@ on:
       nuget-package-name:
         description: 'NuGet package name'
         required: true
-        type: string
+        type: string      
       dotnet-version:
         required: false
         type: string
@@ -49,7 +49,6 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: ${{ inputs.dotnet-version }} 
-          
       - name: Build Project
         run: dotnet build ${{ inputs.csproj-path }} --configuration ${{ inputs.build-configuration }}
 
@@ -90,7 +89,7 @@ jobs:
             CURRENT_VERSION=$DEFAULT_VERSION
           fi
           
-          echo "::set-output name=version::$CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Increment version
         id: increment_version
@@ -102,7 +101,7 @@ jobs:
           PATCH=${VERSION_PARTS[2]}
           NEW_PATCH=$((PATCH + 1))
           NEXT_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          echo "::set-output name=next_version::$NEXT_VERSION"
+          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
           echo "Next version: $NEXT_VERSION"
 
   tag:
@@ -113,12 +112,13 @@ jobs:
       - name: Create and Push Git Tag
         run: |
           git config --global user.email "greg@xerris.com"
-          git config --global user.name "Greg COok"
+          git config --global user.name "Greg Cook"
           NEXT_VERSION=${{ needs.version.outputs.next_version }}
           git tag "v$NEXT_VERSION"
           git push origin "v$NEXT_VERSION"
 
   pack:
+    needs: [version, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -130,11 +130,10 @@ jobs:
       - name: Pack NuGet package
         env:
           DOTNET_OUTPUT_DIR: ./packages
-          PACKAGE_VERSION: 0.0.2
         run: |
           dotnet pack ${{ inputs.csproj-path }} \
           --configuration ${{ inputs.build-configuration }} \
-          /p:Version=$PACKAGE_VERSION \
+          /p:Version=${{ needs.version.outputs.next_version }} \
           /p:PackageOutputPath=$DOTNET_OUTPUT_DIR
           
       - name: Upload NuGet package
@@ -144,7 +143,7 @@ jobs:
           path: ./packages
 
   publish:
-    needs: pack
+    needs: [pack, tag]
     runs-on: ubuntu-latest
     steps:
       - name: Download NuGet package
