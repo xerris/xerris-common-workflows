@@ -25,7 +25,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
   build:
     needs: setup
@@ -35,14 +35,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
       - name: Build Project
         run: dotnet build ${{ inputs.csproj-path }} --configuration Release
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-output
-          path: '**/bin/Release/net8.0'
+          path: '**/bin/Release/net9.0'
 
   test:
     needs: build
@@ -52,7 +52,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
       - name: Test Project
         run: dotnet test ${{ inputs.csproj-path }} --verbosity normal
 
@@ -110,7 +110,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Pack NuGet package
         env:
