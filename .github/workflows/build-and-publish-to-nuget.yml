@@ -147,27 +147,27 @@ jobs:
           dotnet-version: ${{ inputs.dotnet-version }}
       - name: Pack NuGet package
         env:
-          DOTNET_OUTPUT_DIR: ./packages
+          PACKAGES_DIR: ./packages
         run: |
           dotnet pack ${{ inputs.csproj-path }} \
           --configuration ${{ inputs.build-configuration }} \
           /p:Version=${{ needs.version.outputs.next_version }} \
-          /p:PackageOutputPath=$DOTNET_OUTPUT_DIR
+          /p:PackageOutputPath=$PACKAGES_DIR
           
           if [ $? -ne 0 ]; then
             echo "Error: dotnet pack command failed"
             exit 1
           fi
           
-          if [ ! -f ./packages/*.nupkg ]; then
-            echo "Error: No .nupkg file found in ./packages directory"
+          if [ ! -f $PACKAGES_DIR/*.nupkg ]; then
+            echo "Error: No .nupkg file found in " + $PACKAGES_DIR + " directory"
             exit 1
           fi
       - name: Upload NuGet package
         uses: actions/upload-artifact@v4
         with:
           name: nuget-package
-          path: ./packages/*.nupkg
+          path: $PACKAGES_DIR/*.nupkg
 
   publish:
     needs: [pack, version]
