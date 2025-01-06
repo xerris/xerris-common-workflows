@@ -49,8 +49,7 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
       - name: Build Project
-        run: dotnet build ${{ inputs.csproj-path }} \
-              --configuration ${{ inputs.build-configuration }}
+        run: dotnet build ${{ inputs.csproj-path }} --configuration ${{ inputs.build-configuration }}
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
