@@ -29,6 +29,9 @@ on:
       NUGET_SOURCE_URI:
         required: true
 
+env:
+  PACKAGES_DIR: ./packages
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -120,19 +123,16 @@ jobs:
           NEXT_VERSION=${{ needs.version.outputs.next_version }}
           TAG_NAME="v$NEXT_VERSION"
           
-          # Check if the tag exists locally
           if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
             echo "Removing existing local tag $TAG_NAME"
             git tag -d "$TAG_NAME"
           fi
           
-          # Check if the tag exists on the remote
           if git ls-remote --tags origin | grep -q "$TAG_NAME"; then
             echo "Removing existing remote tag $TAG_NAME"
             git push origin --delete "$TAG_NAME"
           fi
           
-          # Create and push the new tag
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"
 
@@ -146,28 +146,30 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
       - name: Pack NuGet package
-        env:
-          PACKAGES_DIR: ./packages
         run: |
+          mkdir -p $PACKAGES_DIR
           dotnet pack ${{ inputs.csproj-path }} \
           --configuration ${{ inputs.build-configuration }} \
           /p:Version=${{ needs.version.outputs.next_version }} \
-          /p:PackageOutputPath=$PACKAGES_DIR
+          --output $PACKAGES_DIR
           
           if [ $? -ne 0 ]; then
             echo "Error: dotnet pack command failed"
             exit 1
           fi
-          
-          if [ ! -f $PACKAGES_DIR/*.nupkg ]; then
-            echo "Error: No .nupkg file found in " + $PACKAGES_DIR + " directory"
+      - name: List package directory
+        run: ls -R $PACKAGES_DIR
+      - name: Check for .nupkg file
+        run: |
+          if ! ls $PACKAGES_DIR/*.nupkg 1> /dev/null 2>&1; then
+            echo "Error: No .nupkg file found in $PACKAGES_DIR directory"
             exit 1
           fi
       - name: Upload NuGet package
         uses: actions/upload-artifact@v4
         with:
           name: nuget-package
-          path: $PACKAGES_DIR/*.nupkg
+          path: ${{ env.PACKAGES_DIR }}/*.nupkg
 
   publish:
     needs: [pack, version]
@@ -177,14 +179,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nuget-package
-          path: ./packages
+          path: ${{ env.PACKAGES_DIR }}
       - name: List package contents
-        run: ls -R ./packages
+        run: ls -R ${{ env.PACKAGES_DIR }}
       - name: Publish to NuGet
         run: |
-          PACKAGE_FILE=$(find ./packages -name "*.nupkg" | head -n 1)
+          PACKAGE_FILE=$(find ${{ env.PACKAGES_DIR }} -name "*.nupkg" | head -n 1)
           if [ -z "$PACKAGE_FILE" ]; then
-            echo "Error: No .nupkg file found in ./packages directory"
+            echo "Error: No .nupkg file found in ${{ env.PACKAGES_DIR }} directory"
             exit 1
           fi
           dotnet nuget push "$PACKAGE_FILE" \
