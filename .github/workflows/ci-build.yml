@@ -42,7 +42,7 @@ jobs:
         with:
           name: ${{ inputs.artifact-name }}
           path: '**/bin/${{ inputs.build-configuration }}/${{ inputs.release-path }}'
-          retention-days: 1
+          if-no-files-found: error
 
   test:
     runs-on: ubuntu-latest
@@ -60,6 +60,8 @@ jobs:
         with:
           name: ${{ inputs.artifact-name }}
 
+      - name: Display structure of downloaded files
+        run: ls -R
+
       - name: Test
         run: dotnet test --no-restore --verbosity normal
-
