@@ -3,6 +3,14 @@ name: BuildAndPublishNuGet
 on:
   workflow_call:
     inputs:
+      nuget-package-name:
+        description: 'NuGet package name'
+        required: true
+        type: string
+      csproj-path:
+        description: 'Path to the .csproj file'
+        required: true
+        type: string
       dotnet-version:
         required: false
         type: string
@@ -15,14 +23,6 @@ on:
         required: false
         type: string
         default: 'Release'
-      csproj-path:
-        description: 'Path to the .csproj file'
-        required: true
-        type: string
-      nuget-package-name:
-        description: 'NuGet package name'
-        required: true
-        type: string
     secrets:
       NUGET_API_KEY:
         required: true
@@ -49,7 +49,8 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
       - name: Build Project
-        run: dotnet build ${{ inputs.csproj-path }} --configuration ${{ inputs.build-configuration }}
+        run: dotnet build ${{ inputs.csproj-path }} \
+              --configuration ${{ inputs.build-configuration }}
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -91,7 +92,7 @@ jobs:
             echo "Current version of $PACKAGE_NAME: $CURRENT_VERSION"
           fi
 
-          echo "::set-output name=version::$CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
       - name: Increment version
         id: increment_version
         run: |
@@ -102,7 +103,7 @@ jobs:
           PATCH=${VERSION_PARTS[2]}
           NEW_PATCH=$((PATCH + 1))
           NEXT_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          echo "::set-output name=next_version::$NEXT_VERSION"
+          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
           echo "Next version: $NEXT_VERSION"
 
   tag:
@@ -113,12 +114,13 @@ jobs:
       - name: Create and Push Git Tag
         run: |
           git config --global user.email "greg@xerris.com"
-          git config --global user.name "Greg COok"
+          git config --global user.name "Greg Cook"
           NEXT_VERSION=${{ needs.version.outputs.next_version }}
           git tag "v$NEXT_VERSION"
           git push origin "v$NEXT_VERSION"
 
   pack:
+    needs: [setup, build, test, version, tag]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -126,25 +128,32 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
-
       - name: Pack NuGet package
         env:
           DOTNET_OUTPUT_DIR: ./packages
-          PACKAGE_VERSION: 0.0.2
         run: |
           dotnet pack ${{ inputs.csproj-path }} \
           --configuration ${{ inputs.build-configuration }} \
-          /p:Version=$PACKAGE_VERSION \
+          /p:Version=${{ needs.version.outputs.next_version }} \
           /p:PackageOutputPath=$DOTNET_OUTPUT_DIR
-
+          
+          if [ $? -ne 0 ]; then
+            echo "Error: dotnet pack command failed"
+            exit 1
+          fi
+          
+          if [ ! -f ./packages/*.nupkg ]; then
+            echo "Error: No .nupkg file found in ./packages directory"
+            exit 1
+          fi
       - name: Upload NuGet package
         uses: actions/upload-artifact@v4
         with:
           name: nuget-package
-          path: ./packages
+          path: ./packages/*.nupkg
 
   publish:
-    needs: pack
+    needs: [pack, version]
     runs-on: ubuntu-latest
     steps:
       - name: Download NuGet package
@@ -152,10 +161,17 @@ jobs:
         with:
           name: nuget-package
           path: ./packages
+      - name: List package contents
+        run: ls -R ./packages
       - name: Publish to NuGet
-        run: >
-          dotnet nuget push ./packages/*.nupkg
-          --api-key ${{ secrets.NUGET_API_KEY }}
-          --source "${{ secrets.NUGET_SOURCE_URI }}/v3/index.json"
-          --timeout 360
+        run: |
+          PACKAGE_FILE=$(find ./packages -name "*.nupkg" | head -n 1)
+          if [ -z "$PACKAGE_FILE" ]; then
+            echo "Error: No .nupkg file found in ./packages directory"
+            exit 1
+          fi
+          dotnet nuget push "$PACKAGE_FILE" \
+          --api-key ${{ secrets.NUGET_API_KEY }} \
+          --source "${{ secrets.NUGET_SOURCE_URI }}/v3/index.json" \
+          --timeout 360 \
           --skip-duplicate
