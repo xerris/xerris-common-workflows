@@ -107,17 +107,34 @@ jobs:
           echo "Next version: $NEXT_VERSION"
 
   tag:
-    needs: [test,version]
+    needs: [test, version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Create and Push Git Tag
         run: |
           git config --global user.email "greg@xerris.com"
           git config --global user.name "Greg Cook"
           NEXT_VERSION=${{ needs.version.outputs.next_version }}
-          git tag "v$NEXT_VERSION"
-          git push origin "v$NEXT_VERSION"
+          TAG_NAME="v$NEXT_VERSION"
+          
+          # Check if the tag exists locally
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Removing existing local tag $TAG_NAME"
+            git tag -d "$TAG_NAME"
+          fi
+          
+          # Check if the tag exists on the remote
+          if git ls-remote --tags origin | grep -q "$TAG_NAME"; then
+            echo "Removing existing remote tag $TAG_NAME"
+            git push origin --delete "$TAG_NAME"
+          fi
+          
+          # Create and push the new tag
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
 
   pack:
     needs: [setup, build, test, version, tag]
