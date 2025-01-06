@@ -69,6 +69,7 @@ jobs:
         run: dotnet test ${{ inputs.csproj-path }} --verbosity normal
 
   version:
+    needs: setup
     runs-on: ubuntu-latest
     outputs:
       next_version: ${{ steps.increment_version.outputs.next_version }}
@@ -106,7 +107,7 @@ jobs:
           echo "Next version: $NEXT_VERSION"
 
   tag:
-    needs: version
+    needs: [test,version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
