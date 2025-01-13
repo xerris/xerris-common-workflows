@@ -49,19 +49,22 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v3
-
+  
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
-
+  
+      - name: Restore dependencies
+        run: dotnet restore
+  
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
           name: ${{ inputs.artifact-name }}
-
+  
       - name: Display structure of downloaded files
         run: ls -R
-
+  
       - name: Test
         run: dotnet test --no-restore --verbosity normal
